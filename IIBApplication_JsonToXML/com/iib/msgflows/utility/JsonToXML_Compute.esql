@@ -1,0 +1,56 @@
+BROKER SCHEMA com.iib.msgflows.utility
+
+
+CREATE COMPUTE MODULE JsonToXML_Compute
+	CREATE FUNCTION Main() RETURNS BOOLEAN
+	BEGIN
+		-- CALL CopyMessageHeaders();
+		-- CALL CopyEntireMessage();
+		DECLARE inputRef REFERENCE TO InputRoot.JSON.Data;		
+		--SET OutputRoot.XMLNSC.Data = inputRef;
+		
+		CASE 
+			
+		WHEN EXISTS(InputLocalEnvironment.Destination.HTTP.RequestIdentifier[]) THEN
+			SET OutputRoot.XMLNSC.Data = inputRef;
+			DECLARE id INTEGER;
+			CALL GetActorByName('ED','CHASE',id);
+			SET OutputRoot.XMLNSC.Data.ActorId = id;
+			PROPAGATE TO TERMINAL 'out';
+		WHEN EXISTS(InputRoot.MQMD.CorrelId[]) THEN
+			SET OutputRoot.MQMD = InputRoot.MQMD;
+			SET OutputRoot.MQRFH2.usr.MyVal = 'Input from message flow one';
+			SET OutputRoot.MQMD.ReplyToQ = 'XML_MSG.OUT';
+			SET OutputRoot.XMLNSC.Data = inputRef;
+			PROPAGATE TO TERMINAL 'out1';
+		ELSE
+			SET OutputRoot.XMLNSC.Data = inputRef;
+			PROPAGATE TO TERMINAL 'out2';
+			
+		END CASE;
+		
+		
+		
+		RETURN FALSE;
+	END;
+
+	CREATE PROCEDURE CopyMessageHeaders() BEGIN
+		DECLARE I INTEGER 1;
+		DECLARE J INTEGER;
+		SET J = CARDINALITY(InputRoot.*[]);
+		WHILE I < J DO
+			SET OutputRoot.*[I] = InputRoot.*[I];
+			SET I = I + 1;
+		END WHILE;
+	END;
+
+	CREATE PROCEDURE CopyEntireMessage() BEGIN
+		SET OutputRoot = InputRoot;
+	END;
+	
+	CREATE PROCEDURE GetActorByName (IN firstname CHARACTER, IN lastname CHARACTER, INOUT ActorId INTEGER )
+	LANGUAGE DATABASE
+	EXTERNAL NAME "Get_ActorIdFromName";
+	
+	
+END MODULE;
